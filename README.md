@@ -155,3 +155,21 @@ You must understand every line you submit. We check this with your video and in 
 5. Paste the repository link and the video link in the application form.
 
 We will run `pnpm install && pnpm check && pnpm typecheck && pnpm test` on your repository.
+
+## Decisions
+
+1. Whole cents, split with integer math. All money is stored as integer cents,
+   never decimals. Each member gets `floor(total / members)`, and the first
+   `total % members` members, in the order they were added, get one extra cent.
+   The shares always add up to the total.
+
+2. Payment safety in one SQL statement. Paying runs
+   `UPDATE ... WHERE paid_at IS NULL`, so the check and the change happen together.
+   If two requests pay at the same time, only one succeeds. The other one reads the
+   share back: the same Idempotency-Key returns 200 with the same result, and a
+   different key returns 409.
+
+3. Database constraints and a batch insert. The schema has named constraints
+   (foreign keys, `CHECK total_cents > 0`, `UNIQUE (bill_id, member_id)`), so bad
+   data is rejected even if the API code has a bug. A bill and its shares are saved
+   in one `DB.batch`, so a bill never exists with only some of its shares.
